@@ -195,9 +195,16 @@ class CodeBlockContainerView(
         if (isNotEmpty() && last() == '\n') deleteCharAt(length - 1)
       }
 
-      // For height measurement, use container width (large) to allow wrapping fallback
+      var maxLineWidth = 0f
+      for (line in text.split("\n")) {
+        val width = paint.measureText(line)
+        if (width > maxLineWidth) maxLineWidth = width
+      }
+      val naturalWidth = maxOf(1, ceil(maxLineWidth).toInt() + padding * 2)
+
+      // Match the actual code block rendering path: no wrapping, horizontal scroll.
       val layout = StaticLayout.Builder
-        .obtain(text, 0, text.length, paint, (context.resources.displayMetrics.widthPixels * 2))
+        .obtain(text, 0, text.length, paint, naturalWidth)
         .setIncludePad(false)
         .build()
 
