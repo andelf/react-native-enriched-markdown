@@ -6,7 +6,11 @@ class EnrichedMarkdownTextLayoutManager(
   fun invalidateLayout() {
     val text = view.text
     val paint = view.paint
-    MeasurementStore.store(view.id, text, paint)
+    val heightChanged = MeasurementStore.store(view.id, text, paint)
+    if (heightChanged) {
+      view.requestLayout()
+      view.invalidate()
+    }
   }
 
   fun releaseMeasurementStore() {

@@ -1,5 +1,6 @@
 package com.swmansion.enriched.markdown.renderer
 
+import android.os.Build
 import android.text.SpannableStringBuilder
 import com.swmansion.enriched.markdown.parser.MarkdownASTNode
 import com.swmansion.enriched.markdown.spans.CodeBackgroundSpan
@@ -18,7 +19,11 @@ class CodeRenderer(
   ) {
     if (node.children.isEmpty() || node.children.all { it.content.isEmpty() }) return
 
-    factory.renderWithSpan(builder, { node.children.forEach { builder.append(it.content) } }) { start, end, blockStyle ->
+    factory.renderWithSpan(builder, {
+      node.children.forEach { child ->
+        builder.append(inlineCodeTextWithSoftWraps(child.content))
+      }
+    }) { start, end, blockStyle ->
       builder.setSpan(
         CodeSpan(factory.styleCache, blockStyle, factory.context),
         start,
@@ -32,5 +37,21 @@ class CodeRenderer(
         SPAN_FLAGS_EXCLUSIVE_EXCLUSIVE,
       )
     }
+  }
+
+  private fun inlineCodeTextWithSoftWraps(content: String): CharSequence {
+    if (content.isEmpty() || Build.VERSION.SDK_INT < Build.VERSION_CODES.N) return content
+
+    val result = StringBuilder(content.length * 2)
+    var index = 0
+    while (index < content.length) {
+      val codePoint = content.codePointAt(index)
+      result.appendCodePoint(codePoint)
+      index += Character.charCount(codePoint)
+      if (index < content.length) {
+        result.append('\u200B')
+      }
+    }
+    return result
   }
 }
