@@ -14,9 +14,7 @@ import com.facebook.react.bridge.ReadableMap
 import com.swmansion.enriched.markdown.parser.MarkdownASTNode
 import com.swmansion.enriched.markdown.parser.Md4cFlags
 import com.swmansion.enriched.markdown.parser.Parser
-import com.swmansion.enriched.markdown.renderer.Renderer
 import com.swmansion.enriched.markdown.renderer.SpanStyleCache
-import com.swmansion.enriched.markdown.spans.ImageSpan
 import com.swmansion.enriched.markdown.styles.StyleConfig
 import com.swmansion.enriched.markdown.utils.common.FeatureFlags
 import com.swmansion.enriched.markdown.utils.text.view.emitLinkLongPressEvent
@@ -26,27 +24,6 @@ import com.swmansion.enriched.markdown.views.CodeBlockContainerView
 import com.swmansion.enriched.markdown.views.TableContainerView
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
-
-private sealed interface RenderSegment {
-  data class Text(
-    val styledText: SpannableString,
-    val imageSpans: List<ImageSpan>,
-    val needsJustify: Boolean,
-    val lastElementMarginBottom: Float,
-  ) : RenderSegment
-
-  data class Table(
-    val node: MarkdownASTNode,
-  ) : RenderSegment
-
-  data class Math(
-    val latex: String,
-  ) : RenderSegment
-
-  data class CodeBlock(
-    val node: MarkdownASTNode,
-  ) : RenderSegment
-}
 
 class EnrichedMarkdown
   @JvmOverloads
@@ -181,44 +158,7 @@ class EnrichedMarkdown
             }
 
           val processedSegments =
-            splitASTIntoSegments(ast).map { segmentNode ->
-              when (segmentNode) {
-                is MarkdownASTNode -> {
-                  when (segmentNode.type) {
-                    MarkdownASTNode.NodeType.Table -> {
-                      RenderSegment.Table(segmentNode)
-                    }
-
-                    MarkdownASTNode.NodeType.LatexMathDisplay -> {
-                      val latex =
-                        if (segmentNode.children.isNotEmpty()) {
-                          segmentNode.children.first().content
-                        } else {
-                          segmentNode.content
-                        }
-                      RenderSegment.Math(latex)
-                    }
-
-                    MarkdownASTNode.NodeType.CodeBlock -> {
-                      RenderSegment.CodeBlock(segmentNode)
-                    }
-
-                    else -> {
-                      renderTextSegment(listOf(segmentNode), style)
-                    }
-                  }
-                }
-
-                is List<*> -> {
-                  @Suppress("UNCHECKED_CAST")
-                  renderTextSegment(segmentNode as List<MarkdownASTNode>, style)
-                }
-
-                else -> {
-                  throw IllegalArgumentException("Unknown segment type")
-                }
-              }
-            }
+            MarkdownSegmentBuilder.build(ast, style, context, onLinkPressCallback, onLinkLongPressCallback)
 
           postToMain(renderId) { applyRenderedSegments(processedSegments, style) }
         } catch (e: Exception) {
@@ -228,33 +168,18 @@ class EnrichedMarkdown
       }
     }
 
-    private fun renderTextSegment(
-      nodes: List<MarkdownASTNode>,
-      style: StyleConfig,
-    ): RenderSegment.Text {
-      val documentWrapper = MarkdownASTNode(type = MarkdownASTNode.NodeType.Document, children = nodes)
-      val renderer = Renderer().apply { configure(style, context) }
-
-      return RenderSegment.Text(
-        styledText = renderer.renderDocument(documentWrapper, onLinkPressCallback, onLinkLongPressCallback),
-        imageSpans = renderer.getCollectedImageSpans().toList(),
-        needsJustify = style.needsJustify,
-        lastElementMarginBottom = renderer.getLastElementMarginBottom(),
-      )
-    }
-
     private fun applyRenderedSegments(
-      renderedSegments: List<RenderSegment>,
+      renderedSegments: List<MarkdownRenderSegment>,
       style: StyleConfig,
     ) {
       clearSegments()
       renderedSegments.forEach { segment ->
         val view =
           when (segment) {
-            is RenderSegment.Text -> createTextView(segment)
-            is RenderSegment.Table -> createTableView(segment, style)
-            is RenderSegment.Math -> createMathView(segment, style)
-            is RenderSegment.CodeBlock -> createCodeBlockView(segment, style)
+            is MarkdownRenderSegment.Text -> createTextView(segment)
+            is MarkdownRenderSegment.Table -> createTableView(segment, style)
+            is MarkdownRenderSegment.Math -> createMathView(segment, style)
+            is MarkdownRenderSegment.CodeBlock -> createCodeBlockView(segment, style)
           }
         segmentViews.add(view)
         addView(view)
@@ -262,7 +187,7 @@ class EnrichedMarkdown
       layoutSegments()
     }
 
-    private fun createTextView(segment: RenderSegment.Text) =
+    private fun createTextView(segment: MarkdownRenderSegment.Text) =
       EnrichedMarkdownInternalText(context).apply {
         setIsSelectable(selectable)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && segment.needsJustify) {
@@ -278,7 +203,7 @@ class EnrichedMarkdown
       }
 
     private fun createTableView(
-      segment: RenderSegment.Table,
+      segment: MarkdownRenderSegment.Table,
       style: StyleConfig,
     ) = TableContainerView(context, style).apply {
       allowFontScaling = this@EnrichedMarkdown.allowFontScaling
@@ -289,14 +214,14 @@ class EnrichedMarkdown
     }
 
     private fun createCodeBlockView(
-      segment: RenderSegment.CodeBlock,
+      segment: MarkdownRenderSegment.CodeBlock,
       style: StyleConfig,
     ) = CodeBlockContainerView(context, style).apply {
       applyCodeBlockNode(segment.node)
     }
 
     private fun createMathView(
-      segment: RenderSegment.Math,
+      segment: MarkdownRenderSegment.Math,
       style: StyleConfig,
     ): android.view.View {
       if (!FeatureFlags.IS_MATH_ENABLED) return android.view.View(context)
@@ -311,35 +236,6 @@ class EnrichedMarkdown
       } catch (_: Exception) {
         android.view.View(context)
       }
-    }
-
-    private fun splitASTIntoSegments(root: MarkdownASTNode): List<Any> {
-      val segments = mutableListOf<Any>()
-      val currentTextBuffer = mutableListOf<MarkdownASTNode>()
-
-      fun flushTextBuffer() {
-        if (currentTextBuffer.isNotEmpty()) {
-          segments.add(currentTextBuffer.toList())
-          currentTextBuffer.clear()
-        }
-      }
-
-      root.children.forEach { child ->
-        if (child.type == MarkdownASTNode.NodeType.Table) {
-          flushTextBuffer()
-          segments.add(child)
-        } else if (child.type == MarkdownASTNode.NodeType.LatexMathDisplay) {
-          flushTextBuffer()
-          segments.add(child)
-        } else if (child.type == MarkdownASTNode.NodeType.CodeBlock) {
-          flushTextBuffer()
-          segments.add(child)
-        } else {
-          currentTextBuffer.add(child)
-        }
-      }
-      flushTextBuffer()
-      return segments
     }
 
     private fun postToMain(

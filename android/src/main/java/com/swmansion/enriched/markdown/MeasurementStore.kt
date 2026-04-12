@@ -12,7 +12,6 @@ import com.facebook.react.bridge.ReadableMap
 import com.facebook.react.uimanager.PixelUtil
 import com.facebook.yoga.YogaMeasureMode
 import com.facebook.yoga.YogaMeasureOutput
-import com.swmansion.enriched.markdown.parser.MarkdownASTNode
 import com.swmansion.enriched.markdown.parser.Md4cFlags
 import com.swmansion.enriched.markdown.parser.Parser
 import com.swmansion.enriched.markdown.renderer.Renderer
@@ -276,26 +275,6 @@ object MeasurementStore {
     return adjustedSize
   }
 
-/** Sealed interface for type-safe segment handling */
-  private sealed interface MarkdownSegment {
-    data class Text(
-      val nodes: List<MarkdownASTNode>,
-    ) : MarkdownSegment
-
-    data class Table(
-      val node: MarkdownASTNode,
-    ) : MarkdownSegment
-
-    data class Math(
-      val latex: String,
-      val node: MarkdownASTNode,
-    ) : MarkdownSegment
-
-    data class CodeBlock(
-      val node: MarkdownASTNode,
-    ) : MarkdownSegment
-  }
-
   private fun measureAndCacheSplit(
     context: Context,
     id: Int?,
@@ -325,13 +304,13 @@ object MeasurementStore {
           ?: return YogaMeasureOutput.make(PixelUtil.toDIPFromPixel(width), 0f)
 
       val style = StyleConfig(styleMap, context, allowFontScaling, maxFontSizeMultiplier)
-      val segments = splitASTIntoSegments(ast)
+      val segments = MarkdownSegmentBuilder.build(ast, style, context, null, null)
 
       val mathHeightByIndex = HashMap<Int, Float>()
       val mathSegmentIndices = mutableListOf<Int>()
       val mathRequests = mutableListOf<MathMeasureRequest>()
       for ((i, segment) in segments.withIndex()) {
-        if (segment is MarkdownSegment.Math) {
+        if (segment is MarkdownRenderSegment.Math) {
           mathSegmentIndices.add(i)
           mathRequests.add(
             MathMeasureRequest(
@@ -360,21 +339,18 @@ object MeasurementStore {
         val includeBottomMargin = if (isLastSegment) allowTrailingMargin else true
 
         when (segment) {
-          is MarkdownSegment.Text -> {
-            val segmentRenderer = Renderer().apply { configure(style, context) }
-            val tempDoc = MarkdownASTNode(type = MarkdownASTNode.NodeType.Document, children = segment.nodes)
-            val styledText = segmentRenderer.renderDocument(tempDoc, null)
+          is MarkdownRenderSegment.Text -> {
+            val styledText = SpannableString(segment.styledText)
             styledText.replaceMathSpansWithPlaceholders(context)
-
             val layout = createStaticLayout(styledText, fontSize, widthPx)
             totalHeightPx += layout.height
 
             if (includeBottomMargin) {
-              totalHeightPx += segmentRenderer.getLastElementMarginBottom()
+              totalHeightPx += segment.lastElementMarginBottom
             }
           }
 
-          is MarkdownSegment.Table -> {
+          is MarkdownRenderSegment.Table -> {
             totalHeightPx += style.tableStyle.marginTop
             totalHeightPx += TableContainerView.measureTableNodeHeight(segment.node, style, context)
             if (includeBottomMargin) {
@@ -382,7 +358,7 @@ object MeasurementStore {
             }
           }
 
-          is MarkdownSegment.Math -> {
+          is MarkdownRenderSegment.Math -> {
             totalHeightPx += style.mathStyle.marginTop
             totalHeightPx += mathHeightByIndex[index] ?: 0f
             if (includeBottomMargin) {
@@ -390,7 +366,7 @@ object MeasurementStore {
             }
           }
 
-          is MarkdownSegment.CodeBlock -> {
+          is MarkdownRenderSegment.CodeBlock -> {
             totalHeightPx += style.codeBlockStyle.marginTop
             totalHeightPx += CodeBlockContainerView.measureCodeBlockNodeHeight(segment.node, style, context)
             if (includeBottomMargin) {
@@ -431,49 +407,6 @@ object MeasurementStore {
           setUseLineSpacingFromFallbacks(true)
         }
       }.build()
-  }
-
-  private fun splitASTIntoSegments(root: MarkdownASTNode): List<MarkdownSegment> {
-    val segments = mutableListOf<MarkdownSegment>()
-    val currentTextNodes = mutableListOf<MarkdownASTNode>()
-
-    fun flushTextNodes() {
-      if (currentTextNodes.isNotEmpty()) {
-        segments.add(MarkdownSegment.Text(currentTextNodes.toList()))
-        currentTextNodes.clear()
-      }
-    }
-
-    for (child in root.children) {
-      when (child.type) {
-        MarkdownASTNode.NodeType.Table -> {
-          flushTextNodes()
-          segments.add(MarkdownSegment.Table(child))
-        }
-
-        MarkdownASTNode.NodeType.LatexMathDisplay -> {
-          flushTextNodes()
-          val latex =
-            if (child.children.isNotEmpty()) {
-              child.children.first().content
-            } else {
-              child.content
-            }
-          segments.add(MarkdownSegment.Math(latex, child))
-        }
-
-        MarkdownASTNode.NodeType.CodeBlock -> {
-          flushTextNodes()
-          segments.add(MarkdownSegment.CodeBlock(child))
-        }
-
-        else -> {
-          currentTextNodes.add(child)
-        }
-      }
-    }
-    flushTextNodes()
-    return segments
   }
 
   private fun tryRenderMarkdown(
