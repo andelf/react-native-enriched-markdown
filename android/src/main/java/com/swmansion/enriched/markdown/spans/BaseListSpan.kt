@@ -83,12 +83,12 @@ abstract class BaseListSpan(
 
   @SuppressLint("WrongConstant")
   private fun applyTextStyle(textPaint: TextPaint) {
-    textPaint.textSize = blockStyle.fontSize
-
     // Skip font override if the paint already carries a monospace typeface set by CodeSpan —
-    // otherwise BaseListSpan (which wraps the entire list item) would clobber it.
+    // otherwise BaseListSpan (which wraps the entire list item) would clobber both the
+    // code typeface and code-specific font size inside list items.
     val isMonospace = SpanStyleCache.isMonospaceTypeface(textPaint.typeface)
     if (!isMonospace) {
+      textPaint.textSize = blockStyle.fontSize
       val preservedStyle = (textPaint.typeface?.style ?: 0) and BOLD_ITALIC_MASK
       textPaint.applyBlockStyleFont(blockStyle, context)
       if (preservedStyle != 0) {
