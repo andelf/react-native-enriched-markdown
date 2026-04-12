@@ -1,0 +1,55 @@
+@@ -3,6 +3,7 @@
+ import android.content.ClipData
+ import android.content.ClipboardManager
+ import android.content.Context
++import android.view.MotionEvent
+ import android.graphics.Canvas
+ import android.graphics.Paint
+ import android.graphics.Path
+@@ -51,10 +52,42 @@
+   var onLinkLongPress: ((String) -> Unit)? = null
+ 
+   private val scrollView =
+-    HorizontalScrollView(context).apply {
+-      isHorizontalScrollBarEnabled = true
+-      overScrollMode = View.OVER_SCROLL_NEVER
+-      addView(GridContainerView(context))
++    object : HorizontalScrollView(context) {
++      private var startX = 0f
++      private var startY = 0f
++      private var didDisallow = false
++
++      override fun onInterceptTouchEvent(ev: MotionEvent): Boolean {
++        when (ev.action) {
++          MotionEvent.ACTION_DOWN -> {
++            startX = ev.x
++            startY = ev.y
++            didDisallow = false
++            parent?.requestDisallowInterceptTouchEvent(true)
++          }
++          MotionEvent.ACTION_MOVE -> {
++            val dx = Math.abs(ev.x - startX)
++            val dy = Math.abs(ev.y - startY)
++            if (!didDisallow && dx > dy && dx > 8f * density) {
++              didDisallow = true
++              parent?.requestDisallowInterceptTouchEvent(true)
++            } else if (!didDisallow && dy > dx && dy > 8f * density) {
++              parent?.requestDisallowInterceptTouchEvent(false)
++            }
++          }
++          MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
++            parent?.requestDisallowInterceptTouchEvent(false)
++            didDisallow = false
++          }
++        }
++        return super.onInterceptTouchEvent(ev)
++      }
++
++      init {
++        isHorizontalScrollBarEnabled = true
++        overScrollMode = View.OVER_SCROLL_NEVER
++        addView(GridContainerView(context))
++      }
+     }
+   private val gridContainer get() = scrollView.getChildAt(0) as GridContainerView
+ 

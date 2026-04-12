@@ -1,0 +1,20 @@
+#include "MarkdownTextShadowNode.h"
+
+#include <react/renderer/core/LayoutContext.h>
+
+namespace facebook::react {
+
+extern const char MarkdownTextComponentName[] = "EnrichedMarkdownText";
+
+void MarkdownTextShadowNode::setMeasurementsManager(
+    const std::shared_ptr<MarkdownTextMeasurementManager> &measurementsManager) {
+  ensureUnsealed();
+  measurementsManager_ = measurementsManager;
+}
+
+Size MarkdownTextShadowNode::measureContent(const LayoutContext &layoutContext,
+                                            const LayoutConstraints &layoutConstraints) const {
+  return measurementsManager_->measure(getSurfaceId(), getTag(), getConcreteProps(), layoutConstraints);
+}
+
+} // namespace facebook::react

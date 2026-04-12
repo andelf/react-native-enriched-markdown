@@ -1,0 +1,222 @@
+package com.swmansion.enriched.markdown
+
+import android.content.Context
+import com.facebook.react.bridge.ReadableMap
+import com.facebook.react.module.annotations.ReactModule
+import com.facebook.react.uimanager.SimpleViewManager
+import com.facebook.react.uimanager.ThemedReactContext
+import com.facebook.react.uimanager.UIManagerHelper
+import com.facebook.react.uimanager.ViewManagerDelegate
+import com.facebook.react.uimanager.annotations.ReactProp
+import com.facebook.react.viewmanagers.EnrichedMarkdownTextManagerDelegate
+import com.facebook.react.viewmanagers.EnrichedMarkdownTextManagerInterface
+import com.facebook.yoga.YogaMeasureMode
+import com.swmansion.enriched.markdown.events.LinkLongPressEvent
+import com.swmansion.enriched.markdown.events.LinkPressEvent
+import com.swmansion.enriched.markdown.events.TaskListItemPressEvent
+import com.swmansion.enriched.markdown.parser.Md4cFlags
+import com.swmansion.enriched.markdown.utils.common.FeatureFlags
+import com.swmansion.enriched.markdown.utils.text.interaction.TaskListTapUtils
+import com.swmansion.enriched.markdown.utils.text.interaction.TaskListToggleUtils
+
+@ReactModule(name = EnrichedMarkdownTextManager.NAME)
+class EnrichedMarkdownTextManager :
+  SimpleViewManager<EnrichedMarkdownText>(),
+  EnrichedMarkdownTextManagerInterface<EnrichedMarkdownText> {
+  private val mDelegate: ViewManagerDelegate<EnrichedMarkdownText> = EnrichedMarkdownTextManagerDelegate(this)
+
+  override fun getDelegate(): ViewManagerDelegate<EnrichedMarkdownText>? = mDelegate
+
+  override fun getName(): String = NAME
+
+  override fun createViewInstance(reactContext: ThemedReactContext): EnrichedMarkdownText = EnrichedMarkdownText(reactContext)
+
+  override fun onDropViewInstance(view: EnrichedMarkdownText) {
+    super.onDropViewInstance(view)
+    MeasurementStore.clearFontScalingSettings(view.id)
+    view.layoutManager.releaseMeasurementStore()
+    view.clearActiveImageSpans()
+  }
+
+  override fun getExportedCustomDirectEventTypeConstants(): MutableMap<String, Any> {
+    val map = mutableMapOf<String, Any>()
+    map[LinkPressEvent.EVENT_NAME] = mapOf("registrationName" to LinkPressEvent.EVENT_NAME)
+    map[LinkLongPressEvent.EVENT_NAME] = mapOf("registrationName" to LinkLongPressEvent.EVENT_NAME)
+    map[TaskListItemPressEvent.EVENT_NAME] =
+      mapOf("registrationName" to TaskListItemPressEvent.EVENT_NAME)
+    return map
+  }
+
+  @ReactProp(name = "markdown")
+  override fun setMarkdown(
+    view: EnrichedMarkdownText?,
+    markdown: String?,
+  ) {
+    view?.setOnLinkPressCallback { url ->
+      emitOnLinkPress(view, url)
+    }
+
+    view?.setOnLinkLongPressCallback { url ->
+      emitOnLinkLongPress(view, url)
+    }
+
+    view?.setOnTaskListItemPressCallback { taskIndex, checked, itemText ->
+      val newChecked = !checked
+
+      val styleConfig = view.markdownStyle
+      val optimizedSuccess =
+        styleConfig != null && TaskListTapUtils.updateTaskListItemCheckedState(view, taskIndex, newChecked, styleConfig)
+
+      if (optimizedSuccess) {
+        emitOnTaskListItemPress(view, taskIndex, newChecked, itemText)
+        return@setOnTaskListItemPressCallback
+      }
+
+      val currentMarkdown = view.currentMarkdown
+      val updatedMarkdown = TaskListToggleUtils.toggleAtIndex(currentMarkdown, taskIndex, newChecked)
+      view.setMarkdownContent(updatedMarkdown)
+
+      emitOnTaskListItemPress(view, taskIndex, newChecked, itemText)
+    }
+
+    view?.setMarkdownContent(markdown ?: "No markdown content")
+  }
+
+  @ReactProp(name = "markdownStyle")
+  override fun setMarkdownStyle(
+    view: EnrichedMarkdownText?,
+    style: com.facebook.react.bridge.ReadableMap?,
+  ) {
+    view?.setMarkdownStyle(style)
+  }
+
+  @ReactProp(name = "selectable", defaultBoolean = true)
+  override fun setSelectable(
+    view: EnrichedMarkdownText?,
+    selectable: Boolean,
+  ) {
+    view?.setIsSelectable(selectable)
+  }
+
+  @ReactProp(name = "md4cFlags")
+  override fun setMd4cFlags(
+    view: EnrichedMarkdownText?,
+    flags: ReadableMap?,
+  ) {
+    val md4cFlags =
+      Md4cFlags(
+        underline = flags?.getBoolean("underline") ?: false,
+        latexMath = FeatureFlags.IS_MATH_ENABLED && (flags?.getBoolean("latexMath") ?: true),
+      )
+    view?.setMd4cFlags(md4cFlags)
+  }
+
+  @ReactProp(name = "allowFontScaling", defaultBoolean = true)
+  override fun setAllowFontScaling(
+    view: EnrichedMarkdownText?,
+    allowFontScaling: Boolean,
+  ) {
+    view?.setAllowFontScaling(allowFontScaling)
+  }
+
+  @ReactProp(name = "maxFontSizeMultiplier", defaultFloat = 0f)
+  override fun setMaxFontSizeMultiplier(
+    view: EnrichedMarkdownText?,
+    maxFontSizeMultiplier: Float,
+  ) {
+    view?.setMaxFontSizeMultiplier(maxFontSizeMultiplier)
+  }
+
+  @ReactProp(name = "allowTrailingMargin", defaultBoolean = false)
+  override fun setAllowTrailingMargin(
+    view: EnrichedMarkdownText?,
+    allowTrailingMargin: Boolean,
+  ) {
+    view?.setAllowTrailingMargin(allowTrailingMargin)
+  }
+
+  @ReactProp(name = "enableLinkPreview", defaultBoolean = true)
+  override fun setEnableLinkPreview(
+    view: EnrichedMarkdownText?,
+    enableLinkPreview: Boolean,
+  ) {
+    // This prop is only used on iOS (to control the system link preview on long press).
+    // Required by the codegen interface but is a no-op on Android.
+  }
+
+  @ReactProp(name = "streamingAnimation", defaultBoolean = false)
+  override fun setStreamingAnimation(
+    view: EnrichedMarkdownText?,
+    streamingAnimation: Boolean,
+  ) {
+    view?.setStreamingAnimation(streamingAnimation)
+  }
+
+  override fun setPadding(
+    view: EnrichedMarkdownText,
+    left: Int,
+    top: Int,
+    right: Int,
+    bottom: Int,
+  ) {
+    super.setPadding(view, left, top, right, bottom)
+    view.setPadding(left, top, right, bottom)
+  }
+
+  private fun emitOnLinkPress(
+    view: EnrichedMarkdownText,
+    url: String,
+  ) {
+    val context = view.context as com.facebook.react.bridge.ReactContext
+    val surfaceId = UIManagerHelper.getSurfaceId(context)
+    val eventDispatcher = UIManagerHelper.getEventDispatcherForReactTag(context, view.id)
+    val event = LinkPressEvent(surfaceId, view.id, url)
+
+    eventDispatcher?.dispatchEvent(event)
+  }
+
+  private fun emitOnLinkLongPress(
+    view: EnrichedMarkdownText,
+    url: String,
+  ) {
+    val context = view.context as com.facebook.react.bridge.ReactContext
+    val surfaceId = UIManagerHelper.getSurfaceId(context)
+    val eventDispatcher = UIManagerHelper.getEventDispatcherForReactTag(context, view.id)
+    val event = LinkLongPressEvent(surfaceId, view.id, url)
+
+    eventDispatcher?.dispatchEvent(event)
+  }
+
+  private fun emitOnTaskListItemPress(
+    view: EnrichedMarkdownText,
+    taskIndex: Int,
+    checked: Boolean,
+    itemText: String,
+  ) {
+    val context = view.context as com.facebook.react.bridge.ReactContext
+    val surfaceId = UIManagerHelper.getSurfaceId(context)
+    val eventDispatcher = UIManagerHelper.getEventDispatcherForReactTag(context, view.id)
+    val event = TaskListItemPressEvent(surfaceId, view.id, taskIndex, checked, itemText)
+
+    eventDispatcher?.dispatchEvent(event)
+  }
+
+  override fun measure(
+    context: Context,
+    localData: ReadableMap?,
+    props: ReadableMap?,
+    state: ReadableMap?,
+    width: Float,
+    widthMode: YogaMeasureMode?,
+    height: Float,
+    heightMode: YogaMeasureMode?,
+    attachmentsPositions: FloatArray?,
+  ): Long {
+    val id = localData?.getInt("viewTag")
+    return MeasurementStore.getMeasureById(context, id, width, height, heightMode, props)
+  }
+
+  companion object {
+    const val NAME = "EnrichedMarkdownText"
+  }
+}
