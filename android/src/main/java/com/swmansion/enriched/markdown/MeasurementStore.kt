@@ -25,6 +25,7 @@ import com.swmansion.enriched.markdown.utils.common.getBooleanOrDefault
 import com.swmansion.enriched.markdown.utils.common.getMapOrNull
 import com.swmansion.enriched.markdown.utils.common.getStringOrDefault
 import com.swmansion.enriched.markdown.utils.text.extensions.replaceMathSpansWithPlaceholders
+import com.swmansion.enriched.markdown.views.CodeBlockContainerView
 import com.swmansion.enriched.markdown.views.TableContainerView
 import java.util.concurrent.ConcurrentHashMap
 import kotlin.math.ceil
@@ -289,6 +290,10 @@ object MeasurementStore {
       val latex: String,
       val node: MarkdownASTNode,
     ) : MarkdownSegment
+
+    data class CodeBlock(
+      val node: MarkdownASTNode,
+    ) : MarkdownSegment
   }
 
   private fun measureAndCacheSplit(
@@ -384,6 +389,14 @@ object MeasurementStore {
               totalHeightPx += style.mathStyle.marginBottom
             }
           }
+
+          is MarkdownSegment.CodeBlock -> {
+            totalHeightPx += style.codeBlockStyle.marginTop
+            totalHeightPx += CodeBlockContainerView.measureCodeBlockNodeHeight(segment.node, style, context)
+            if (includeBottomMargin) {
+              totalHeightPx += style.codeBlockStyle.marginBottom
+            }
+          }
         }
       }
 
@@ -447,6 +460,11 @@ object MeasurementStore {
               child.content
             }
           segments.add(MarkdownSegment.Math(latex, child))
+        }
+
+        MarkdownASTNode.NodeType.CodeBlock -> {
+          flushTextNodes()
+          segments.add(MarkdownSegment.CodeBlock(child))
         }
 
         else -> {

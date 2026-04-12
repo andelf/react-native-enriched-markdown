@@ -15,12 +15,14 @@ import com.swmansion.enriched.markdown.parser.MarkdownASTNode
 import com.swmansion.enriched.markdown.parser.Md4cFlags
 import com.swmansion.enriched.markdown.parser.Parser
 import com.swmansion.enriched.markdown.renderer.Renderer
+import com.swmansion.enriched.markdown.renderer.SpanStyleCache
 import com.swmansion.enriched.markdown.spans.ImageSpan
 import com.swmansion.enriched.markdown.styles.StyleConfig
 import com.swmansion.enriched.markdown.utils.common.FeatureFlags
 import com.swmansion.enriched.markdown.utils.text.view.emitLinkLongPressEvent
 import com.swmansion.enriched.markdown.utils.text.view.emitLinkPressEvent
 import com.swmansion.enriched.markdown.views.BlockSegmentView
+import com.swmansion.enriched.markdown.views.CodeBlockContainerView
 import com.swmansion.enriched.markdown.views.TableContainerView
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
@@ -40,6 +42,10 @@ private sealed interface RenderSegment {
   data class Math(
     val latex: String,
   ) : RenderSegment
+
+  data class CodeBlock(
+    val node: MarkdownASTNode,
+  ) : RenderSegment
 }
 
 class EnrichedMarkdown
@@ -49,6 +55,9 @@ class EnrichedMarkdown
     attrs: AttributeSet? = null,
     defStyleAttr: Int = 0,
   ) : FrameLayout(context, attrs, defStyleAttr) {
+    init {
+      SpanStyleCache.initAssetFonts(context)
+    }
     private val parser = Parser.shared
     private val mainHandler = Handler(Looper.getMainLooper())
     private val executor: ExecutorService = Executors.newSingleThreadExecutor()
@@ -190,6 +199,10 @@ class EnrichedMarkdown
                       RenderSegment.Math(latex)
                     }
 
+                    MarkdownASTNode.NodeType.CodeBlock -> {
+                      RenderSegment.CodeBlock(segmentNode)
+                    }
+
                     else -> {
                       renderTextSegment(listOf(segmentNode), style)
                     }
@@ -241,6 +254,7 @@ class EnrichedMarkdown
             is RenderSegment.Text -> createTextView(segment)
             is RenderSegment.Table -> createTableView(segment, style)
             is RenderSegment.Math -> createMathView(segment, style)
+            is RenderSegment.CodeBlock -> createCodeBlockView(segment, style)
           }
         segmentViews.add(view)
         addView(view)
@@ -272,6 +286,13 @@ class EnrichedMarkdown
       onLinkPress = onLinkPressCallback
       onLinkLongPress = onLinkLongPressCallback
       applyTableNode(segment.node)
+    }
+
+    private fun createCodeBlockView(
+      segment: RenderSegment.CodeBlock,
+      style: StyleConfig,
+    ) = CodeBlockContainerView(context, style).apply {
+      applyCodeBlockNode(segment.node)
     }
 
     private fun createMathView(
@@ -308,6 +329,9 @@ class EnrichedMarkdown
           flushTextBuffer()
           segments.add(child)
         } else if (child.type == MarkdownASTNode.NodeType.LatexMathDisplay) {
+          flushTextBuffer()
+          segments.add(child)
+        } else if (child.type == MarkdownASTNode.NodeType.CodeBlock) {
           flushTextBuffer()
           segments.add(child)
         } else {

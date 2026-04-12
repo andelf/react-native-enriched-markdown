@@ -20,7 +20,7 @@ class CodeRenderer(
 
     factory.renderWithSpan(builder, { node.children.forEach { builder.append(it.content) } }) { start, end, blockStyle ->
       builder.setSpan(
-        CodeSpan(factory.styleCache, blockStyle),
+        CodeSpan(factory.styleCache, blockStyle, factory.context),
         start,
         end,
         SPAN_FLAGS_EXCLUSIVE_EXCLUSIVE,

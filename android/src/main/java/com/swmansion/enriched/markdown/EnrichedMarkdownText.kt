@@ -15,6 +15,7 @@ import com.swmansion.enriched.markdown.accessibility.MarkdownAccessibilityHelper
 import com.swmansion.enriched.markdown.parser.Md4cFlags
 import com.swmansion.enriched.markdown.parser.Parser
 import com.swmansion.enriched.markdown.renderer.Renderer
+import com.swmansion.enriched.markdown.renderer.SpanStyleCache
 import com.swmansion.enriched.markdown.styles.StyleConfig
 import com.swmansion.enriched.markdown.utils.text.TailFadeInAnimator
 import com.swmansion.enriched.markdown.utils.text.interaction.CheckboxTouchHelper
@@ -38,6 +39,9 @@ class EnrichedMarkdownText
     attrs: AttributeSet? = null,
     defStyleAttr: Int = 0,
   ) : AppCompatTextView(context, attrs, defStyleAttr) {
+    init {
+      SpanStyleCache.initAssetFonts(context)
+    }
     private val parser = Parser.shared
     private val renderer = Renderer()
     private var onLinkPressCallback: ((String) -> Unit)? = null

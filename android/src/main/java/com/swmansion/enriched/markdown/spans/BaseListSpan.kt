@@ -85,10 +85,15 @@ abstract class BaseListSpan(
   private fun applyTextStyle(textPaint: TextPaint) {
     textPaint.textSize = blockStyle.fontSize
 
-    val preservedStyle = (textPaint.typeface?.style ?: 0) and BOLD_ITALIC_MASK
-    textPaint.applyBlockStyleFont(blockStyle, context)
-    if (preservedStyle != 0) {
-      textPaint.typeface?.let { base -> textPaint.typeface = Typeface.create(base, preservedStyle) }
+    // Skip font override if the paint already carries a monospace typeface set by CodeSpan —
+    // otherwise BaseListSpan (which wraps the entire list item) would clobber it.
+    val isMonospace = SpanStyleCache.isMonospaceTypeface(textPaint.typeface)
+    if (!isMonospace) {
+      val preservedStyle = (textPaint.typeface?.style ?: 0) and BOLD_ITALIC_MASK
+      textPaint.applyBlockStyleFont(blockStyle, context)
+      if (preservedStyle != 0) {
+        textPaint.typeface?.let { base -> textPaint.typeface = Typeface.create(base, preservedStyle) }
+      }
     }
 
     textPaint.applyColorPreserving(blockStyle.color, *styleCache.colorsToPreserve)

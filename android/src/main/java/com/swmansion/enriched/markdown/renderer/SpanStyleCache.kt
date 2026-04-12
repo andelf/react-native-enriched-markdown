@@ -1,5 +1,6 @@
 package com.swmansion.enriched.markdown.renderer
 
+import android.content.Context
 import android.graphics.Typeface
 import com.swmansion.enriched.markdown.styles.StyleConfig
 
@@ -61,6 +62,38 @@ class SpanStyleCache(
 
   companion object {
     private val typefaceCache = mutableMapOf<String, Typeface>()
+    private var assetMonoRegular: Typeface? = null
+    private var assetMonoBold: Typeface? = null
+    private var assetMonoItalic: Typeface? = null
+    private var assetMonoBoldItalic: Typeface? = null
+    private var assetFontsLoaded = false
+
+    /** Load bundled monospace font from assets (call once with any Context). */
+    fun initAssetFonts(context: Context) {
+      if (assetFontsLoaded) return
+      try {
+        val assets = context.assets
+        assetMonoRegular = Typeface.createFromAsset(assets, "fonts/JetBrainsMono-Regular.ttf")
+        assetMonoBold = Typeface.createFromAsset(assets, "fonts/JetBrainsMono-Bold.ttf")
+        assetMonoItalic = Typeface.createFromAsset(assets, "fonts/JetBrainsMono-Italic.ttf")
+        assetMonoBoldItalic = Typeface.createFromAsset(assets, "fonts/JetBrainsMono-BoldItalic.ttf")
+        assetFontsLoaded = true
+      } catch (_: Exception) {
+        // Font files not bundled — fall back to system monospace
+      }
+    }
+
+    private fun getAssetMonoForStyle(style: Int): Typeface? {
+      if (!assetFontsLoaded) return null
+      val isBold = (style and Typeface.BOLD) != 0
+      val isItalic = (style and Typeface.ITALIC) != 0
+      return when {
+        isBold && isItalic -> assetMonoBoldItalic
+        isBold -> assetMonoBold
+        isItalic -> assetMonoItalic
+        else -> assetMonoRegular
+      } ?: assetMonoRegular
+    }
 
     /** Cached typeface for font family + style (BOLD, ITALIC, BOLD_ITALIC) */
     fun getTypeface(
@@ -89,10 +122,21 @@ class SpanStyleCache(
       return getTypeface(fontFamily, style)
     }
 
-    /** Cached monospace typeface preserving bold/italic */
+    /** Cached monospace typeface preserving bold/italic — prefers bundled asset font. */
     fun getMonospaceTypeface(currentStyle: Int): Typeface =
       typefaceCache.getOrPut("monospace|$currentStyle") {
-        Typeface.create(Typeface.MONOSPACE, currentStyle)
+        getAssetMonoForStyle(currentStyle)
+          ?: Typeface.create(Typeface.MONOSPACE, currentStyle)
       }
+
+    /** Check if a typeface is one of the known monospace typefaces (asset or system). */
+    fun isMonospaceTypeface(typeface: Typeface?): Boolean {
+      if (typeface == null) return false
+      // Check against cached asset monospace fonts
+      if (typeface === assetMonoRegular || typeface === assetMonoBold ||
+          typeface === assetMonoItalic || typeface === assetMonoBoldItalic) return true
+      // Check against cached monospace typefaces from getMonospaceTypeface()
+      return typefaceCache.values.any { it === typeface }
+    }
   }
 }
