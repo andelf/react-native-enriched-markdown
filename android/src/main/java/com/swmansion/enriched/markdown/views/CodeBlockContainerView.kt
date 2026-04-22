@@ -122,7 +122,7 @@ class CodeBlockContainerView(
       // Disable line wrapping — content scrolls horizontally
       isSingleLine = false
       maxLines = Int.MAX_VALUE
-      setHorizontallyScrolling(false)
+      setHorizontallyScrolling(true)
     }
 
     val innerFrame = FrameLayout(context).apply {
