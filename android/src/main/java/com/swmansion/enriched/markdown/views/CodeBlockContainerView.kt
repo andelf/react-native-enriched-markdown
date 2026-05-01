@@ -144,7 +144,9 @@ class CodeBlockContainerView(
   }
 
   private fun resolveMonospaceTypeface(): Typeface {
-    SpanStyleCache.initAssetFonts(context)
+    SpanStyleCache.getBundledMonospaceTypeface(context, Typeface.NORMAL)?.let {
+      return it
+    }
     if (codeStyle.fontFamily.isNotEmpty() && codeStyle.fontFamily != "monospace") {
       val cached = SpanStyleCache.getTypeface(codeStyle.fontFamily, Typeface.NORMAL)
       if (cached != Typeface.DEFAULT) return cached
@@ -181,8 +183,9 @@ class CodeBlockContainerView(
     ): Float {
       val style = config.codeBlockStyle
       val padding = style.padding.toInt()
-      SpanStyleCache.initAssetFonts(context)
-      val typeface = SpanStyleCache.getMonospaceTypeface(Typeface.NORMAL)
+      val typeface =
+        SpanStyleCache.getBundledMonospaceTypeface(context, Typeface.NORMAL)
+          ?: SpanStyleCache.getMonospaceTypeface(Typeface.NORMAL)
       val paint = TextPaint(Paint.ANTI_ALIAS_FLAG).apply {
         textSize = style.fontSize
         this.typeface = typeface

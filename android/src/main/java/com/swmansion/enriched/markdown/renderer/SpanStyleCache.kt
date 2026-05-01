@@ -95,6 +95,19 @@ class SpanStyleCache(
       } ?: assetMonoRegular
     }
 
+    /**
+     * Direct asset-font path for code rendering. This bypasses the shared
+     * typeface cache so an early system "monospace" lookup cannot poison
+     * code spans or code blocks on OEM Android builds.
+     */
+    fun getBundledMonospaceTypeface(
+      context: Context,
+      style: Int,
+    ): Typeface? {
+      initAssetFonts(context)
+      return getAssetMonoForStyle(style)
+    }
+
     /** Cached typeface for font family + style (BOLD, ITALIC, BOLD_ITALIC) */
     fun getTypeface(
       fontFamily: String,
