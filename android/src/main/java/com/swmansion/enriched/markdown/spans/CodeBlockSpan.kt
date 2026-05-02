@@ -5,6 +5,7 @@ import android.graphics.Canvas
 import android.graphics.Paint
 import android.graphics.Path
 import android.graphics.RectF
+import android.graphics.Typeface
 import android.text.Layout
 import android.text.Spanned
 import android.text.TextPaint
@@ -15,7 +16,6 @@ import androidx.core.graphics.withSave
 import com.swmansion.enriched.markdown.renderer.BlockStyle
 import com.swmansion.enriched.markdown.renderer.SpanStyleCache
 import com.swmansion.enriched.markdown.styles.CodeBlockStyle
-import com.swmansion.enriched.markdown.utils.text.extensions.applyBlockStyleFont
 import com.swmansion.enriched.markdown.utils.text.extensions.applyColorPreserving
 
 class CodeBlockSpan(
@@ -189,7 +189,15 @@ class CodeBlockSpan(
   private fun applyTextStyle(tp: TextPaint) {
     tp.textSize = blockStyle.fontSize
 
-    tp.applyBlockStyleFont(blockStyle, context)
+    val fontWeight = codeBlockStyle.fontWeight.lowercase()
+    val style =
+      when (fontWeight) {
+        "bold", "700", "800", "900" -> Typeface.BOLD
+        else -> Typeface.NORMAL
+      }
+    tp.typeface =
+      SpanStyleCache.getBundledMonospaceTypeface(context, style)
+        ?: SpanStyleCache.getMonospaceTypeface(style)
 
     tp.applyColorPreserving(blockStyle.color, *styleCache.colorsToPreserve)
   }
