@@ -71,12 +71,9 @@ class TaskListSpan(
     val fontMetrics = paint.fontMetrics
     val capHeight = -fontMetrics.ascent * CAP_HEIGHT_RATIO
     val centerY = baseline - capHeight / HALF_DIVISOR
-    // Place the checkbox so its right edge sits a fixed gap before where the
-    // text content actually begins (derived from the layout), keeping nested
-    // checkboxes clear of the text. Fallback preserves the depth-0 position.
     val half = checkboxSize / HALF_DIVISOR
     val fallbackCenter = x + (depth * marginLeft + half) * dir
-    val textStartX = layout?.getPrimaryHorizontal(start) ?: fallbackCenter
+    val textStartX = textContentStart(layout, start, fallbackCenter)
     val centerX = textStartX - (effectiveGap() + half) * dir
     rect.set(centerX - half, centerY - half, centerX + half, centerY + half)
 

@@ -35,6 +35,16 @@ abstract class BaseListSpan(
 
   protected fun effectiveGap(): Float = gapWidth.coerceAtLeast(DEFAULT_MIN_GAP)
 
+  // Where the text content actually begins, after all accumulated leading
+  // margins. Anchoring markers to this (rather than recomputing depth*marginLeft
+  // + markerWidth) keeps them clear of the text at every nesting depth. The
+  // fallback preserves the depth-0 position when no layout is available.
+  protected fun textContentStart(
+    layout: Layout?,
+    start: Int,
+    fallback: Float,
+  ): Float = layout?.getPrimaryHorizontal(start) ?: fallback
+
   override fun getLeadingMargin(first: Boolean): Int =
     if (depth == 0) {
       (getMarkerWidth() + effectiveGap()).toInt()
