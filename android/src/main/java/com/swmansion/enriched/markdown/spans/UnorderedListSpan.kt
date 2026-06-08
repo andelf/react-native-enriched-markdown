@@ -55,7 +55,12 @@ class UnorderedListSpan(
     start: Int,
   ) {
     val bulletPaint = configureBulletPaint()
-    val bulletX = x + (depth * marginLeft + radius) * dir
+    // Center the bullet a fixed gap before where the text content actually
+    // begins (derived from the layout), so nested bullets stay clear of the
+    // text just like ordered markers. Fallback preserves the depth-0 position.
+    val fallbackCenter = x + (depth * marginLeft + radius) * dir
+    val textStartX = layout?.getPrimaryHorizontal(start) ?: fallbackCenter
+    val bulletX = textStartX - effectiveGap() * dir
     val fontMetrics = paint.fontMetrics
     val bulletY = baseline + (fontMetrics.ascent + fontMetrics.descent) / 2f
 

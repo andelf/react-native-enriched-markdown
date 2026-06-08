@@ -73,7 +73,14 @@ class OrderedListSpan(
     val text = if (dir < 0) ".$itemNumber" else "$itemNumber."
     val textWidth = markerPaint.measureText(text)
 
-    val markerRightEdge = x + (depth * marginLeft + getMarkerWidth()) * dir
+    // Anchor the marker a fixed gap before where the text content actually
+    // begins. Deriving the text start from the layout (rather than recomputing
+    // it as depth*marginLeft + markerWidth) keeps the number off the text at
+    // every nesting depth — the fallback preserves the depth-0 position when no
+    // layout is available.
+    val fallbackRightEdge = x + (depth * marginLeft + getMarkerWidth()) * dir
+    val textStartX = layout?.getPrimaryHorizontal(start) ?: fallbackRightEdge
+    val markerRightEdge = textStartX - effectiveGap() * dir
     val markerX = if (dir > 0) markerRightEdge - textWidth else markerRightEdge
 
     canvas.drawText(text, markerX, baseline.toFloat(), markerPaint)

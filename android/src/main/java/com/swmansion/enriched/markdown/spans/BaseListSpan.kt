@@ -33,10 +33,11 @@ abstract class BaseListSpan(
 
   override fun updateDrawState(textPaint: TextPaint) = applyTextStyle(textPaint)
 
+  protected fun effectiveGap(): Float = gapWidth.coerceAtLeast(DEFAULT_MIN_GAP)
+
   override fun getLeadingMargin(first: Boolean): Int =
     if (depth == 0) {
-      val effectiveGap = gapWidth.coerceAtLeast(DEFAULT_MIN_GAP)
-      (getMarkerWidth() + effectiveGap).toInt()
+      (getMarkerWidth() + effectiveGap()).toInt()
     } else {
       marginLeft.toInt()
     }
