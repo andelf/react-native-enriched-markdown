@@ -73,10 +73,12 @@ class SpanStyleCache(
       if (assetFontsLoaded) return
       try {
         val assets = context.assets
-        assetMonoRegular = Typeface.createFromAsset(assets, "fonts/JetBrainsMono-Regular.ttf")
-        assetMonoBold = Typeface.createFromAsset(assets, "fonts/JetBrainsMono-Bold.ttf")
-        assetMonoItalic = Typeface.createFromAsset(assets, "fonts/JetBrainsMono-Italic.ttf")
-        assetMonoBoldItalic = Typeface.createFromAsset(assets, "fonts/JetBrainsMono-BoldItalic.ttf")
+        // NL = "No Ligatures" variant: code must render literal characters
+        // (`-->`, `!=`, `::`) without JetBrains Mono's calt/liga substitutions.
+        assetMonoRegular = Typeface.createFromAsset(assets, "fonts/JetBrainsMonoNL-Regular.ttf")
+        assetMonoBold = Typeface.createFromAsset(assets, "fonts/JetBrainsMonoNL-Bold.ttf")
+        assetMonoItalic = Typeface.createFromAsset(assets, "fonts/JetBrainsMonoNL-Italic.ttf")
+        assetMonoBoldItalic = Typeface.createFromAsset(assets, "fonts/JetBrainsMonoNL-BoldItalic.ttf")
         assetFontsLoaded = true
       } catch (_: Exception) {
         // Font files not bundled — fall back to system monospace
