@@ -58,6 +58,17 @@ class TableContainerView(
       private var didDisallow = false
 
       override fun onInterceptTouchEvent(ev: MotionEvent): Boolean {
+        // Only arbitrate the gesture when the table is actually wider than the
+        // viewport. A narrow table that fits leaves a blank strip to the right
+        // of the grid with no child view under it; Android stops calling
+        // onInterceptTouchEvent on ACTION_MOVE there (mFirstTouchTarget is
+        // null), so the ACTION_DOWN requestDisallowInterceptTouchEvent(true)
+        // would never be released and the chat list could never take over the
+        // vertical drag. A non-scrollable table never needs to hold the parent.
+        if (this@TableContainerView.totalTableWidth <= width.toFloat()) {
+          parent?.requestDisallowInterceptTouchEvent(false)
+          return false
+        }
         when (ev.action) {
           MotionEvent.ACTION_DOWN -> {
             startX = ev.x
